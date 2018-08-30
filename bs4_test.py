@@ -17,7 +17,7 @@ class FootballScraper:
 	@staticmethod
 	def save_to_json(years):
 		print('Saving to json file...')
-		with open('fb_data.json', 'w') as f:
+		with open('fb_ucl_data.json', 'w') as f:
 			f.write(json.dumps(years, indent=4))
 		print('File saved...')
 
@@ -58,11 +58,10 @@ class FootballScraper:
 	def gather_pl_team_stats(self, driver):
 		team_results = []
 		checking = True
-		table = 1
 		row = 1
 		while checking:
 			try:
-				team_row = f'//*[@id="mainContent"]/div/div[1]/div[2]/div[2]/div/div[1]/div[{table}]/div/table/tbody/tr[{row}]'
+				team_row = f'//*[@id="mainContent"]/div/div[1]/div[3]/div/div/div/table/tbody/tr[{row}]'
 				stats = self.scrape_team_row(self, driver, team_row)
 				team_results.append(stats)
 				x += 2
@@ -72,17 +71,34 @@ class FootballScraper:
 		
 		
 	def gather_ucl_team_stats(self, driver):
-		team_results = []
-		checking = True
-		x = 1
-		while checking:
+		groups = True
+		group_results = []
+		table = 1
+		group_letter = driver.find_element_by_xpath(f'//*[@id="mainContent"]/div/div[1]/div[2]/div[2]/div/div[1]/div[{table}]/h3').text.split()[1]
+		while groups:
+			print(f'Group: {group_letter}')
+			group = {
+				'group': group_letter,
+				'team_results': [],
+			}
+			checking = True
+			row = 1
+			while checking:
+				try:
+					team_row = f'//*[@id="mainContent"]/div/div[1]/div[2]/div[2]/div/div[1]/div[{table}]/div/table/tbody/tr[{row}]'
+					stats = self.scrape_team_row(driver, team_row)
+					group['team_results'].append(stats)
+					row += 2
+				except NoSuchElementException:
+					checking = False
+			group_results.append(group)
+			table += 1
+			# Check if there is another group to scrape
 			try:
-				team_row = f'//*[@id="mainContent"]/div/div[1]/div[2]/div[2]/div/div[1]/div[1]/div/table/tbody/tr[{x}]'
-				stats = self.scrape_team_row(driver, team_row)
-				team_results.append(stats)
-				x += 2
+				group_letter = driver.find_element_by_xpath(f'//*[@id="mainContent"]/div/div[1]/div[2]/div[2]/div/div[1]/div[{table}]/h3').text.split()[1]
 			except NoSuchElementException:
-				checking = False
+				groups = False
+		return group_results
 
 
 	def scrape_league_result(self, driver, season_location):
@@ -91,9 +107,12 @@ class FootballScraper:
 		driver.find_element_by_xpath(season_location).click()
 		time.sleep(3)
 		if self.competition == 'pl':
-			league_finish['team_stats'] = self.gather_pl_team_stats(driver)
-		else if self.competition == 'ucl':
-			league_finish['team_stats'] = self.gather_ucl_team_stats(driver)
+			league_finish['team_results'] = self.gather_pl_team_stats(driver)
+		elif self.competition == 'ucl':
+			# Click 'Group Stage'
+			driver.find_element_by_xpath('//*[@id="mainContent"]/div/div[1]/div[2]/div[1]/ul/li[1]').click()
+			time.sleep(1)
+			league_finish['groups'] = self.gather_ucl_team_stats(driver)
 		return league_finish
 		
 		
@@ -109,21 +128,24 @@ class FootballScraper:
 		driver.find_element_by_css_selector('body > section > div > div').click()
 		time.sleep(2)
 
+		# Click competition dropdown
+		driver.find_element_by_css_selector('#mainContent > div > div.mainTableTab.active > section > div:nth-child(2) > div.current').click()
+		time.sleep(1)
+
 		if self.competition == 'pl':
 			checking = True
 			print(f'Scraping Premier League results for the following season: {self.season}...')
-		else if self.competition == 'ucl':
+
+			# Select competiton
+			driver.find_element_by_xpath('//*[@id="mainContent"]/div/div[1]/section/div[1]/ul/li[1]').click()
+			time.sleep(2)
+		elif self.competition == 'ucl':
 			checking = True
 			print(f'Scraping UEFA Champions League results for the following season: {self.season}...')
-			# Click competition dropdown
-			driver.find_element_by_css_selector('#mainContent > div > div.mainTableTab.active > section > div:nth-child(2) > div.current').click()
-			time.sleep(1)
+			
 			# Select competiton
 			driver.find_element_by_xpath('//*[@id="mainContent"]/div/div[1]/section/div[1]/ul/li[4]').click()
-			time.sleep(1)
-			# Click 'Group Stage'
-			driver.find_element_by_xpath('//*[@id="mainContent"]/div/div[1]/div[2]/div[1]/ul/li[1]').click()
-			time.sleep(1)
+			time.sleep(2)
 		else:
 			checking = False
 			print('Please select a valid competition...')
@@ -133,16 +155,21 @@ class FootballScraper:
 			driver.find_element_by_css_selector('#mainContent > div > div.mainTableTab.active > section > div:nth-child(3) > div.current').click()
 			time.sleep(1)
 			years = []
-			x = 2
+			first = True
+			x = 1
+			if self.competition == 'pl':
+				x += 1
 			while checking:
-				if self.season == 'all' and x != 2:
+				if self.season == 'all' and not first:
 					# Click season filter dropdown
 					driver.find_element_by_css_selector('#mainContent > div > div.mainTableTab.active > section > div:nth-child(3) > div.current').click()
 					time.sleep(1)
-				try:
+				first = False
+				try:				  
 					season_location = f'//*[@id="mainContent"]/div/div[1]/section/div[2]/ul/li[{x}]'
 					season = driver.find_element_by_xpath(season_location).text
 					if season == self.season or self.season == 'all':
+						print(f'Season: {season}...')
 						league_finish = self.scrape_league_result(driver, season_location)
 						print(league_finish)
 						years.append(league_finish)
