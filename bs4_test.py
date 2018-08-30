@@ -23,18 +23,20 @@ class FootballScraper:
 
 	
 	def scrape_team_row(self, driver, team_row):
-		'//*[@id="Tooltip"]/span[1]'
+		x = 0
 		# CHANGE DEPENDING ON COMPETITION
-		league_position = f'{team_row}/td[2]/span[1]'
-		team_name = f'{team_row}/td[3]'	
-		played = f'{team_row}/td[4]'
-		won = f'{team_row}/td[5]'
-		drawn = f'{team_row}/td[6]'
-		lost = f'{team_row}/td[7]'
-		goals_for = f'{team_row}/td[8]'
-		goals_against = f'{team_row}/td[9]'
-		goal_difference = f'{team_row}/td[10]'
-		points = f'{team_row}/td[11]'
+		if self.competition == 'pl':
+			x += 1
+		league_position = f'{team_row}/td[{x+1}]/span[1]'
+		team_name = f'{team_row}/td[{x+2}]'	
+		played = f'{team_row}/td[{x+3}]'
+		won = f'{team_row}/td[{x+4}]'
+		drawn = f'{team_row}/td[{x+5}]'
+		lost = f'{team_row}/td[{x+6}]'
+		goals_for = f'{team_row}/td[{x+7}]'
+		goals_against = f'{team_row}/td[{x+8}]'
+		goal_difference = f'{team_row}/td[{x+9}]'
+		points = f'{team_row}/td[{x+10}]'
 	
 		elems = [league_position, team_name, played, won, drawn, lost, goals_for, goals_against, goal_difference, points]
 		data = [driver.find_element_by_xpath(elem).text for elem in elems]
